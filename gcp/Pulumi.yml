@@ -1,0 +1,3 @@
+name: my-gcp-dwh
+runtime: python
+description: BigQuery DWH infrastructure on GCP

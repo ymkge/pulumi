@@ -9,13 +9,25 @@
 
 *   `gcp/`: Google Cloud Platform 用のサンプル (BigQuery DWH 構築)
 
+
+
 *   `aws/`: Amazon Web Services 用のサンプル (Redshift DWH 構築)
 
-*   `azure/`: Microsoft Azure 用のサンプル (今後追加予定)
+
+
+*   `azure/`: Microsoft Azure 用のサンプル (Synapse Analytics DWH 構築)
+
+
+
+
 
 
 
 ## 前提条件
+
+
+
+
 
 
 
@@ -147,6 +159,28 @@ pulumi destroy
 
     *   IAM ロールの作成 (S3 読み取り権限の付与)
 
-    *   VPC セキュリティグループの設定 (5439 ポートの開放)
+        *   VPC セキュリティグループの設定 (5439 ポートの開放)
 
-    *   デフォルト VPC への自動デプロイ設定
+        *   デフォルト VPC への自動デプロイ設定
+
+    
+
+    ### Azure (`/azure`)
+
+    
+
+    *   **Synapse Analytics DWH**:
+
+        *   **Resource Group**: リソース管理用のグループ作成。
+
+        *   **Data Lake Storage Gen2**: Synapse必須のストレージ基盤 (HNS有効)。
+
+        *   **Synapse Workspace**: 分析エンジンの統合環境。
+
+        *   **Dedicated SQL Pool**: データウェアハウス機能 (最小構成: DW100c)。
+
+        *   **Apache Spark Pool**: ビッグデータ処理機能 (自動停止・オートスケール設定済み)。
+
+        *   **Security**: 管理者パスワードの自動生成と、開発用ファイアウォールルールの設定。
+
+    

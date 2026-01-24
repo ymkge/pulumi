@@ -35,6 +35,10 @@ def deploy_synapse():
         min_numeric=1
     )
 
+    # Configの取得
+    config = pulumi.Config()
+    sql_admin_login = config.get("sqlAdmin") or "sqladminuser"
+
     # Synapse Workspace の作成
     workspace = synapse.Workspace("synapseWorkspace",
         resource_group_name=resource_group.name,
@@ -42,7 +46,7 @@ def deploy_synapse():
             account_url=storage_account.primary_endpoints.dfs,
             filesystem="users",
         ),
-        sql_administrator_login="sqladminuser",
+        sql_administrator_login=sql_admin_login,
         sql_administrator_login_password=sql_admin_password.result,
         identity=synapse.ManagedIdentityArgs(
             type="SystemAssigned",
@@ -51,14 +55,18 @@ def deploy_synapse():
         location=resource_group.location
     )
 
-    # 開発用のFirewallルール (すべてのIPアドレスからのアクセスを許可)
-    # 注意: 本番環境では特定のIPアドレス範囲のみを許可するように設定してください
-    firewall_rule = synapse.IpFirewallRule("allowAll",
-        resource_group_name=resource_group.name,
-        workspace_name=workspace.name,
-        start_ip_address="0.0.0.0",
-        end_ip_address="255.255.255.255"
-    )
+    # 開発用のFirewallルール (Configで指定された範囲のみ許可)
+    # 設定がない場合はルールを作成しない（アクセス不可）
+    allowed_ip_start = config.get("allowedIpStart")
+    allowed_ip_end = config.get("allowedIpEnd")
+
+    if allowed_ip_start and allowed_ip_end:
+        firewall_rule = synapse.IpFirewallRule("allowSpecificRange",
+            resource_group_name=resource_group.name,
+            workspace_name=workspace.name,
+            start_ip_address=allowed_ip_start,
+            end_ip_address=allowed_ip_end
+        )
 
     # 専用SQLプール (Dedicated SQL Pool) の作成 (オプション)
     sql_pool = synapse.SqlPool("sqlPool",

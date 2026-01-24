@@ -10,10 +10,12 @@ def create_data_warehouse():
     # ==============================================================================
     # 設定値 (Configuration)
     # ==============================================================================
+    config = pulumi.Config()
+    
     CLUSTER_IDENTIFIER = "my-redshift-cluster"
     DB_NAME = "analytics_db"
     USERNAME = "admin_user"
-    PASSWORD = "MySecurePassword123!" # ※実際には pulumi config --secret で管理推奨
+    PASSWORD = config.require_secret("dbPassword")
     NODE_TYPE = "dc2.large"           # 開発用には安価な dc2.large を推奨
     CLUSTER_TYPE = "single-node"      # 本番は multi-node 推奨
 
@@ -26,20 +28,25 @@ def create_data_warehouse():
         aws.ec2.GetSubnetsFilterArgs(name="vpc-id", values=[default_vpc.id])
     ])
 
-    # Redshift用のセキュリティグループ作成
-    redshift_sg = aws.ec2.SecurityGroup("redshift-sg",
-        description="Allow Redshift access",
-        vpc_id=default_vpc.id,
-        ingress=[
-            # 5439ポートへのアクセス許可
+    # Ingressルールの作成（ConfigでCIDRが指定されている場合のみ許可）
+    ingress_rules = []
+    allowed_cidr = config.get("allowedCidr")
+    if allowed_cidr:
+        ingress_rules.append(
             aws.ec2.SecurityGroupIngressArgs(
                 protocol="tcp",
                 from_port=5439,
                 to_port=5439,
-                cidr_blocks=["0.0.0.0/0"], # ※注意: 全世界公開。実運用ではIP制限を行ってください
-                description="Redshift Ingress"
+                cidr_blocks=[allowed_cidr],
+                description="Redshift Ingress from Config"
             )
-        ],
+        )
+
+    # Redshift用のセキュリティグループ作成
+    redshift_sg = aws.ec2.SecurityGroup("redshift-sg",
+        description="Allow Redshift access",
+        vpc_id=default_vpc.id,
+        ingress=ingress_rules,
         egress=[
             # アウトバウンドは全許可
             aws.ec2.SecurityGroupEgressArgs(

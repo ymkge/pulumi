@@ -183,4 +183,33 @@ pulumi destroy
 
         *   **Security**: 管理者パスワードの自動生成と、開発用ファイアウォールルールの設定。
 
-    
+
+## Security & Production Readiness (Next Steps)
+
+現在の構成は**開発・検証用 (Development Sandbox)** を想定しており、利便性を優先しています。
+本番環境 (Production) で運用する場合、セキュリティ基準を満たすために以下の改善を推奨します。
+
+### 1. ネットワークセキュリティの強化
+*   **Public Access の無効化**: 現在の `publicly_accessible=True` (AWS) やファイアウォール全開放設定を無効化し、VPCエンドポイント (PrivateLink) や閉域網経由でのみアクセス可能にする。
+*   **IP制限の厳格化**: Config で許可IPを設定するか、踏み台サーバー (Bastion Host) 経由でのアクセスに限定する。
+
+### 2. 認証・機密情報の管理
+*   **Secrets Manager 連携**: パスワードを Pulumi Config で渡すのではなく、AWS Secrets Manager / Azure Key Vault 等で動的に生成・管理し、アプリケーションから参照させる。
+*   **IAM / RBAC の最小権限**: 現在の広範な権限を見直し、必要最小限の権限セット (Least Privilege) を定義する。
+
+### 3. 暗号化と監査
+*   **CMK (Customer Managed Key)**: デフォルトの暗号化キーではなく、自社管理の鍵 (KMS) を使用してデータを暗号化する。
+*   **Audit Logging**: 誰がいつアクセスしたかを追跡するため、監査ログを有効化し、セキュアなストレージへ転送・保管する。
+
+---
+## Configuration (AWS)
+AWS Redshift プロジェクトでは、セキュリティのためパスワードと許可IPを Config で設定する必要があります。
+
+```bash
+cd aws
+# DBパスワードの設定 (必須)
+pulumi config set --secret dbPassword "YourStrongPassword!"
+
+# 許可IPアドレスの設定 (任意: 設定しない場合は外部アクセス不可)
+pulumi config set allowedCidr "203.0.113.1/32"
+```

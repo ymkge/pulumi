@@ -5,184 +5,135 @@
 
 ## ディレクトリ構成
 
-
-
 *   `gcp/`: Google Cloud Platform 用のサンプル (BigQuery DWH 構築)
-
-
-
 *   `aws/`: Amazon Web Services 用のサンプル (Redshift DWH 構築)
-
-
-
 *   `azure/`: Microsoft Azure 用のサンプル (Synapse Analytics DWH 構築)
-
-
-
-
-
-
 
 ## 前提条件
 
-
-
-
-
-
-
 *   [Pulumi CLI](https://www.pulumi.com/docs/install/)
-
 *   Python 3.9 以上
-
 *   各クラウドプロバイダーの CLI ツールと認証設定
-
     *   Google Cloud SDK (`gcloud auth login`, `gcloud auth application-default login`)
-
     *   AWS CLI (`aws configure`)
-
     *   Azure CLI (`az login`)
 
-
-
-## セットアップ & 実行方法 (AWS/GCP共通)
-
-
+## セットアップ & 実行方法 (共通)
 
 各ディレクトリ配下が独立した Pulumi プロジェクトとして構成されています。
 
-
-
 ### 1. ディレクトリへ移動
 
-
-
 ```bash
-
-cd gcp  # または cd aws
-
+cd gcp  # または cd aws, cd azure
 ```
-
-
 
 ### 2. Python 仮想環境の作成と有効化
 
-
-
 ```bash
-
 python3 -m venv venv
-
 source venv/bin/activate
-
 ```
-
-
 
 ### 3. 依存関係のインストール
 
-
-
 ```bash
-
 pip install -r requirements.txt
-
 ```
-
-
 
 ### 4. Pulumi スタックの初期化と選択
 
-
-
 まだスタックがない場合は初期化します。
 
-
-
 ```bash
-
 pulumi stack init dev
-
 ```
 
+### 5. 設定 (Configuration)
 
+各プロバイダー固有の設定を行います。詳細は後述の [Configuration](#configuration) セクションを参照してください。
 
-### 5. デプロイの実行 (プレビュー & 適用)
-
-
+### 6. デプロイの実行 (プレビュー & 適用)
 
 ```bash
-
 pulumi up
-
 ```
-
-
 
 リソースを削除する場合は以下のコマンドを実行します。
 
-
-
 ```bash
-
 pulumi destroy
-
 ```
-
-
 
 ## 実装済みサンプル詳細
 
-
-
 ### GCP (`/gcp`)
 
-
-
 *   **BigQuery DWH**:
-
     *   データセットの作成
-
     *   テーブル作成（日付パーティショニング、クラスタリング設定済み）
-
     *   IAM 権限設定（サービスアカウントへの権限付与）
-
-
 
 ### AWS (`/aws`)
 
-
-
 *   **Redshift DWH**:
-
     *   Redshift クラスターの構築 (Single-node, dc2.large)
-
     *   IAM ロールの作成 (S3 読み取り権限の付与)
+    *   VPC セキュリティグループの設定 (5439 ポートの開放)
+    *   デフォルト VPC への自動デプロイ設定
 
-        *   VPC セキュリティグループの設定 (5439 ポートの開放)
+### Azure (`/azure`)
 
-        *   デフォルト VPC への自動デプロイ設定
+*   **Synapse Analytics DWH**:
+    *   **Resource Group**: リソース管理用のグループ作成。
+    *   **Data Lake Storage Gen2**: Synapse必須のストレージ基盤 (HNS有効)。
+    *   **Synapse Workspace**: 分析エンジンの統合環境。
+    *   **Dedicated SQL Pool**: データウェアハウス機能 (最小構成: DW100c)。
+    *   **Apache Spark Pool**: ビッグデータ処理機能 (自動停止・オートスケール設定済み)。
+    *   **Security**: 管理者パスワードの自動生成と、開発用ファイアウォールルールの設定。
 
-    
+## Configuration
 
-    ### Azure (`/azure`)
+プロジェクトごとの設定項目です。
 
-    
+### AWS (`/aws`)
 
-    *   **Synapse Analytics DWH**:
+Redshift プロジェクトでは、セキュリティのためパスワードの設定が必須です。許可IPは任意です。
 
-        *   **Resource Group**: リソース管理用のグループ作成。
+```bash
+cd aws
 
-        *   **Data Lake Storage Gen2**: Synapse必須のストレージ基盤 (HNS有効)。
+# DBパスワードの設定 (必須)
+pulumi config set --secret dbPassword "YourStrongPassword!"
 
-        *   **Synapse Workspace**: 分析エンジンの統合環境。
+# 許可IPアドレスの設定 (任意: 設定しない場合は外部アクセス不可)
+pulumi config set allowedCidr "203.0.113.1/32"
+```
 
-        *   **Dedicated SQL Pool**: データウェアハウス機能 (最小構成: DW100c)。
+### Azure (`/azure`)
 
-        *   **Apache Spark Pool**: ビッグデータ処理機能 (自動停止・オートスケール設定済み)。
+Synapse Analytics プロジェクトでは、必要に応じて管理者ユーザー名と許可IP範囲を設定できます。
 
-        *   **Security**: 管理者パスワードの自動生成と、開発用ファイアウォールルールの設定。
+```bash
+cd azure
 
+# 管理者ユーザー名の設定 (任意: デフォルトは sqladminuser)
+pulumi config set sqlAdmin "myadmin"
+
+# 許可IP範囲の設定 (任意: 設定しない場合は外部アクセス不可)
+# 1つのIPのみ許可する場合は start と end に同じ値を設定します
+pulumi config set allowedIpStart "203.0.113.1"
+pulumi config set allowedIpEnd "203.0.113.1"
+```
+
+### GCP (`/gcp`)
+
+BigQuery プロジェクトでは、現在 Pulumi Config を使用していません。
+設定を変更する場合は `gcp/bigquery.py` 内の定数定義を直接編集してください。
+
+*   `DATASET_ID`: データセットID
+*   `LOCATION`: ロケーション (例: `asia-northeast1`)
+*   `SA_EMAIL`: 権限を付与するサービスアカウントのメールアドレス
 
 ## Security & Production Readiness (Next Steps)
 
@@ -200,16 +151,3 @@ pulumi destroy
 ### 3. 暗号化と監査
 *   **CMK (Customer Managed Key)**: デフォルトの暗号化キーではなく、自社管理の鍵 (KMS) を使用してデータを暗号化する。
 *   **Audit Logging**: 誰がいつアクセスしたかを追跡するため、監査ログを有効化し、セキュアなストレージへ転送・保管する。
-
----
-## Configuration (AWS)
-AWS Redshift プロジェクトでは、セキュリティのためパスワードと許可IPを Config で設定する必要があります。
-
-```bash
-cd aws
-# DBパスワードの設定 (必須)
-pulumi config set --secret dbPassword "YourStrongPassword!"
-
-# 許可IPアドレスの設定 (任意: 設定しない場合は外部アクセス不可)
-pulumi config set allowedCidr "203.0.113.1/32"
-```

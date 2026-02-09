@@ -79,10 +79,13 @@ pulumi destroy
 ### AWS (`/aws`)
 
 *   **Redshift DWH**:
-    *   Redshift クラスターの構築 (Single-node, dc2.large)
-    *   IAM ロールの作成 (S3 読み取り権限の付与)
-    *   VPC セキュリティグループの設定 (5439 ポートの開放)
-    *   デフォルト VPC への自動デプロイ設定
+    *   **プロビジョニング版**: Redshift クラスターの構築 (Single-node, dc2.large)
+    *   **サーバーレス版 (New)**: Redshift Serverless (Namespace & Workgroup) の構築
+    *   **共通機能**:
+        *   IAM ロールの作成 (S3 読み取り権限の付与)
+        *   VPC セキュリティグループの設定 (5439 ポートの開放)
+        *   デフォルト VPC への自動デプロイ設定
+    *   ※ `aws/__main__.py` 内のコメントアウトを切り替えることで、プロビジョニング版とサーバーレス版を選択してデプロイ可能です。
 
 ### Azure (`/azure`)
 

@@ -3,6 +3,8 @@
 このリポジトリは、Pulumi と Python を使用した IaC (Infrastructure as Code) のサンプルコード集です。
 主要なクラウドプロバイダー (GCP, AWS, Azure) ごとのディレクトリ構成で、実践的なインフラ構築パターンを管理していく予定です。
 
+各プロバイダーの構成やコストの比較については、[COMPARISON.md](COMPARISON.md) を参照してください。
+
 ## ディレクトリ構成
 
 *   `gcp/`: Google Cloud Platform 用のサンプル (BigQuery DWH 構築)

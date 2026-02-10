@@ -1,6 +1,7 @@
-import json
 import pulumi
 import pulumi_aws as aws
+from networking import get_default_vpc_and_subnets, create_redshift_security_group
+from iam import create_redshift_iam_role
 
 def create_redshift_serverless():
     """
@@ -20,66 +21,15 @@ def create_redshift_serverless():
     BASE_CAPACITY = 32  # RPU (Redshift Processing Units): 8-512の範囲で指定可能
 
     # ==============================================================================
-    # 1. ネットワーク設定 (Default VPCを利用)
+    # 1. ネットワーク設定 (共通モジュールを利用)
     # ==============================================================================
-    # デフォルトVPCとサブネットを取得
-    default_vpc = aws.ec2.get_vpc(default=True)
-    default_subnets = aws.ec2.get_subnets(filters=[
-        aws.ec2.GetSubnetsFilterArgs(name="vpc-id", values=[default_vpc.id])
-    ])
-
-    # Ingressルールの作成（ConfigでCIDRが指定されている場合のみ許可）
-    ingress_rules = []
-    allowed_cidr = config.get("allowedCidr")
-    if allowed_cidr:
-        ingress_rules.append(
-            aws.ec2.SecurityGroupIngressArgs(
-                protocol="tcp",
-                from_port=5439,
-                to_port=5439,
-                cidr_blocks=[allowed_cidr],
-                description="Redshift Serverless Ingress"
-            )
-        )
-
-    # Redshift Serverless用のセキュリティグループ作成
-    serverless_sg = aws.ec2.SecurityGroup("redshift-serverless-sg",
-        description="Allow Redshift Serverless access",
-        vpc_id=default_vpc.id,
-        ingress=ingress_rules,
-        egress=[
-            # アウトバウンドは全許可
-            aws.ec2.SecurityGroupEgressArgs(
-                protocol="-1",
-                from_port=0,
-                to_port=0,
-                cidr_blocks=["0.0.0.0/0"]
-            )
-        ]
-    )
+    default_vpc, default_subnets = get_default_vpc_and_subnets()
+    serverless_sg = create_redshift_security_group("redshift-serverless-sg", default_vpc.id)
 
     # ==============================================================================
-    # 2. IAMロールの設定
+    # 2. IAMロールの設定 (共通モジュールを利用)
     # ==============================================================================
-    # Redshiftが他のAWSサービス（S3など）にアクセスするためのロール
-    redshift_role = aws.iam.Role("redshift-serverless-role",
-        assume_role_policy=json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Action": "sts:AssumeRole",
-                "Effect": "Allow",
-                "Principal": {
-                    "Service": "redshift.amazonaws.com"
-                }
-            }]
-        })
-    )
-
-    # S3読み取り権限を付与
-    aws.iam.RolePolicyAttachment("redshift-serverless-s3-read",
-        role=redshift_role.name,
-        policy_arn="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
-    )
+    redshift_role, role_attachment = create_redshift_iam_role("redshift-serverless-role")
 
     # ==============================================================================
     # 3. Redshift Serverless の作成
@@ -102,8 +52,18 @@ def create_redshift_serverless():
         security_group_ids=[serverless_sg.id],
         subnet_ids=default_subnets.ids,
         publicly_accessible=True, # 外部からアクセス可能にする（開発用）
-        opts=pulumi.ResourceOptions(depends_on=[namespace])
+        opts=pulumi.ResourceOptions(depends_on=[namespace, role_attachment])
     )
+
+    # ==============================================================================
+    # 4. 戻り値
+    # ==============================================================================
+    return {
+        "workgroup_endpoint": workgroup.endpoint,
+        "namespace_name": namespace.namespace_name,
+        "database_name": namespace.db_name,
+        "username": ADMIN_USERNAME
+    }
 
     # ==============================================================================
     # 4. 戻り値

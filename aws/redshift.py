@@ -1,6 +1,7 @@
-import json
 import pulumi
 import pulumi_aws as aws
+from networking import get_default_vpc_and_subnets, create_redshift_security_group
+from iam import create_redshift_iam_role
 
 def create_data_warehouse():
     """
@@ -20,43 +21,10 @@ def create_data_warehouse():
     CLUSTER_TYPE = "single-node"      # 本番は multi-node 推奨
 
     # ==============================================================================
-    # 1. ネットワーク設定 (Default VPCを利用)
+    # 1. ネットワーク設定 (共通モジュールを利用)
     # ==============================================================================
-    # デフォルトVPCとサブネットを取得
-    default_vpc = aws.ec2.get_vpc(default=True)
-    default_subnets = aws.ec2.get_subnets(filters=[
-        aws.ec2.GetSubnetsFilterArgs(name="vpc-id", values=[default_vpc.id])
-    ])
-
-    # Ingressルールの作成（ConfigでCIDRが指定されている場合のみ許可）
-    ingress_rules = []
-    allowed_cidr = config.get("allowedCidr")
-    if allowed_cidr:
-        ingress_rules.append(
-            aws.ec2.SecurityGroupIngressArgs(
-                protocol="tcp",
-                from_port=5439,
-                to_port=5439,
-                cidr_blocks=[allowed_cidr],
-                description="Redshift Ingress from Config"
-            )
-        )
-
-    # Redshift用のセキュリティグループ作成
-    redshift_sg = aws.ec2.SecurityGroup("redshift-sg",
-        description="Allow Redshift access",
-        vpc_id=default_vpc.id,
-        ingress=ingress_rules,
-        egress=[
-            # アウトバウンドは全許可
-            aws.ec2.SecurityGroupEgressArgs(
-                protocol="-1",
-                from_port=0,
-                to_port=0,
-                cidr_blocks=["0.0.0.0/0"]
-            )
-        ]
-    )
+    default_vpc, default_subnets = get_default_vpc_and_subnets()
+    redshift_sg = create_redshift_security_group("redshift-sg", default_vpc.id)
 
     # サブネットグループの作成（Redshiftを配置するサブネット群）
     subnet_group = aws.redshift.SubnetGroup("redshift-subnet-group",
@@ -65,27 +33,9 @@ def create_data_warehouse():
     )
 
     # ==============================================================================
-    # 2. IAMロールの設定
+    # 2. IAMロールの設定 (共通モジュールを利用)
     # ==============================================================================
-    # Redshiftが他のAWSサービス（S3など）にアクセスするためのロール
-    redshift_role = aws.iam.Role("redshift-role",
-        assume_role_policy=json.dumps({
-            "Version": "2012-10-17",
-            "Statement": [{
-                "Action": "sts:AssumeRole",
-                "Effect": "Allow",
-                "Principal": {
-                    "Service": "redshift.amazonaws.com"
-                }
-            }]
-        })
-    )
-
-    # 例: S3読み取り権限を付与（S3からCOPYコマンドでロードする場合などに必要）
-    role_attachment = aws.iam.RolePolicyAttachment("redshift-s3-read-only",
-        role=redshift_role.name,
-        policy_arn="arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
-    )
+    redshift_role, role_attachment = create_redshift_iam_role("redshift-role")
 
     # ==============================================================================
     # 3. Redshift クラスターの作成
@@ -111,6 +61,15 @@ def create_data_warehouse():
         
         opts=pulumi.ResourceOptions(depends_on=[role_attachment])
     )
+
+    # ==============================================================================
+    # 4. 戻り値
+    # ==============================================================================
+    return {
+        "cluster_endpoint": cluster.endpoint,
+        "database_name": cluster.database_name,
+        "username": cluster.master_username
+    }
 
     # ==============================================================================
     # 4. 戻り値

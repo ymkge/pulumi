@@ -157,34 +157,34 @@ BigQuery プロジェクトでは、現在 Pulumi Config を使用していま�
 *   **CMK (Customer Managed Key)**: デフォルトの暗号化キーではなく、自社管理の鍵 (KMS) を使用してデータを暗号化する。
 *   **Audit Logging**: 誰がいつアクセスしたかを追跡するため、監査ログを有効化し、セキュアなストレージへ転送・保管する。
 
-## next step
+## Next Steps (リファクタリング・改善計画)
 
-  1. AWS: 重複コードの共通化 (DRY原則)
-  aws/redshift.py と aws/redshift_serverless.py の間で、以下のコードがほぼ同一です。
-   - ネットワーク設定: デフォルトVPC/サブネットの取得、セキュリティグループの作成。
-   - IAMロール: Redshift用の信頼ポリシーを持つIAMロールの作成。
 
-  提案: これらを aws/common_resources.py のような共通モジュールに切り出すことで、コードの重複を排除できます。
 
-  2. Azure: 関数の細分化
-  azure/synapse.py の deploy_synapse()
-  関数が、ストレージ、パスワード生成、ワークスペース、SQLプール、Sparkプールなど、多くのリソース作成を一つの関数で行っています。
+リポジトリ全体の保守性と品質向上のため、以下のタスクを順次実施します。
 
-  提案: 以下のように役割ごとにリソース作成を関数化すると、見通しが良くなります。
-   - create_storage_account()
-   - create_synapse_workspace(storage_account)
-   - create_sql_pool(workspace)
 
-  3. GCP: スキーマ管理と設定の外部化
-  gcp/bigquery.py 内でテーブルスキーマを Python
-  のリスト/辞書として定義していますが、スキーマが複雑になるとコードが読みづらくなります。また、サービスアカウントのメールアドレスがハードコードされて
-  います。
 
-  提案:
-   - スキーマ: gcp/schemas/user_events.json のような外部JSONファイルに分離し、コードからはそれを読み込むようにします。
-   - 設定: ハードコードされている SA_EMAIL を pulumi.Config から取得するように変更します。
+### 1. AWS: 重複コードの共通化 (DRY原則) ✅完了
 
-  4. 全体: ファイル名の整合性
-   - AWS と Azure は Pulumi.yaml ですが、GCP のみ Pulumi.yml となっています。
+*   `aws/networking.py` と `aws/iam.py` へ共通ロジックを抽出し、`redshift.py` および `redshift_serverless.py` を軽量化しました。
 
-  提案: プロジェクト全体で Pulumi.yaml に統一することを推奨します。
+
+
+### 2. Azure: 関数の細分化
+
+*   `azure/synapse.py` の `deploy_synapse()` 関数が巨大化しているため、役割ごとにリソース作成を関数化（`create_storage_account`, `create_synapse_workspace` 等）し、見通しを改善します。
+
+
+
+### 3. GCP: スキーマ管理と設定の外部化
+
+*   `gcp/bigquery.py` 内のテーブルスキーマを外部 JSON ファイル (`gcp/schemas/user_events.json`) に分離します。
+
+*   ハードコードされている `SA_EMAIL` を `pulumi.Config` から取得するように変更します。
+
+
+
+### 4. 全体: プロジェクト設定の整合性
+
+*   GCP の設定ファイルを `Pulumi.yml` から `Pulumi.yaml` に変更し、他プロバイダーとの整合性を確保します。

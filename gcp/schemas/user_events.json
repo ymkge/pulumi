@@ -1,0 +1,26 @@
+[
+    {
+        "name": "event_timestamp",
+        "type": "TIMESTAMP",
+        "mode": "REQUIRED",
+        "description": "イベント発生日時"
+    },
+    {
+        "name": "user_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "ユーザーID"
+    },
+    {
+        "name": "event_name",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "イベント名（例: login, purchase）"
+    },
+    {
+        "name": "event_params",
+        "type": "JSON",
+        "mode": "NULLABLE",
+        "description": "詳細パラメータ（JSON型）"
+    }
+]

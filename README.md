@@ -7,7 +7,7 @@
 
 ## ディレクトリ構成
 
-*   `gcp/`: Google Cloud Platform 用のサンプル (BigQuery DWH 構築)
+*   `gcp/`: Google Cloud Platform 用 of サンプル (BigQuery DWH 構築)
 *   `aws/`: Amazon Web Services 用のサンプル (Redshift DWH 構築)
 *   `azure/`: Microsoft Azure 用のサンプル (Synapse Analytics DWH 構築)
 
@@ -73,7 +73,7 @@ pulumi destroy
 
 *   **BigQuery DWH**:
     *   データセットの作成
-    *   テーブル作成（日付パーティショニング、クラスタリング設定済み）
+    *   テーブル作成（日付パーティショニング、クラスタリング設定済み、スキーマ外部化済み）
     *   IAM 権限設定（サービスアカウントへの権限付与）
 
 ### AWS (`/aws`)
@@ -133,12 +133,20 @@ pulumi config set allowedIpEnd "203.0.113.1"
 
 ### GCP (`/gcp`)
 
-BigQuery プロジェクトでは、現在 Pulumi Config を使用していません。
-設定を変更する場合は `gcp/bigquery.py` 内の定数定義を直接編集してください。
+BigQuery プロジェクトでは、データセットIDやロケーション、IAM権限を付与するサービスアカウントを設定できます。
 
-*   `DATASET_ID`: データセットID
-*   `LOCATION`: ロケーション (例: `asia-northeast1`)
-*   `SA_EMAIL`: 権限を付与するサービスアカウントのメールアドレス
+```bash
+cd gcp
+
+# データセットIDの設定 (任意: デフォルトは app_analytics_dwh)
+pulumi config set dataset_id "my_dataset"
+
+# ロケーションの設定 (任意: デフォルトは asia-northeast1)
+pulumi config set location "asia-northeast1"
+
+# 権限を付与するサービスアカウント (任意: デフォルトはサンプル用SA)
+pulumi config set sa_email "my-service-account@my-project.iam.gserviceaccount.com"
+```
 
 ## Security & Production Readiness (Next Steps)
 
@@ -159,32 +167,17 @@ BigQuery プロジェクトでは、現在 Pulumi Config を使用していま�
 
 ## Next Steps (リファクタリング・改善計画)
 
-
-
-リポジトリ全体の保守性と品質向上のため、以下のタスクを順次実施します。
-
-
+リポジトリ全体の保守性と品質向上のため、以下のタスクを完了しました。
 
 ### 1. AWS: 重複コードの共通化 (DRY原則) ✅完了
-
 *   `aws/networking.py` と `aws/iam.py` へ共通ロジックを抽出し、`redshift.py` および `redshift_serverless.py` を軽量化しました。
 
+### 2. Azure: 関数の細分化 ✅完了
+*   `azure/synapse.py` の `deploy_synapse()` 関数を役割ごとに分割（`create_storage_infrastructure`, `create_synapse_workspace` 等）し、可読性と再利用性を向上させました。
 
+### 3. GCP: スキーマ管理と設定の外部化 ✅完了
+*   テーブルスキーマを外部 JSON ファイル (`gcp/schemas/user_events.json`) に分離しました。
+*   `DATASET_ID`, `LOCATION`, `SA_EMAIL` を `pulumi.Config` から取得するように変更し、柔軟な設定変更を可能にしました。
 
-### 2. Azure: 関数の細分化
-
-*   `azure/synapse.py` の `deploy_synapse()` 関数が巨大化しているため、役割ごとにリソース作成を関数化（`create_storage_account`, `create_synapse_workspace` 等）し、見通しを改善します。
-
-
-
-### 3. GCP: スキーマ管理と設定の外部化
-
-*   `gcp/bigquery.py` 内のテーブルスキーマを外部 JSON ファイル (`gcp/schemas/user_events.json`) に分離します。
-
-*   ハードコードされている `SA_EMAIL` を `pulumi.Config` から取得するように変更します。
-
-
-
-### 4. 全体: プロジェクト設定の整合性
-
-*   GCP の設定ファイルを `Pulumi.yml` から `Pulumi.yaml` に変更し、他プロバイダーとの整合性を確保します。
+### 4. 全体: プロジェクト設定の整合性 ✅完了
+*   GCP の設定ファイルを `Pulumi.yml` から `Pulumi.yaml` に変更し、全プロバイダーで命名規則を統一しました。
